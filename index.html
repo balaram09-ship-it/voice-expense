@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Voice Expense</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ SETUP (first run) ============ -->
+  <section id="setup-screen" class="screen hidden">
+    <div class="setup-inner">
+      <h1 class="brand">VOICE<br>EXPENSE</h1>
+      <p class="setup-sub">Register this device once.</p>
+      <label class="field">
+        <span class="field-label">Server URL</span>
+        <input id="setup-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Device name</span>
+        <input id="setup-device" type="text" placeholder="e.g. Balaram Phone / Counter" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">PIN</span>
+        <input id="setup-pin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">
+      </label>
+      <button id="setup-go" class="btn btn-solid">Register</button>
+      <p id="setup-error" class="setup-error hidden"></p>
+    </div>
+  </section>
+
+  <!-- ============ MAIN ============ -->
+  <section id="main-screen" class="screen hidden">
+
+    <header class="topbar">
+      <div>
+        <div class="brand-small">VOICE EXPENSE</div>
+        <div id="device-label" class="device-label"></div>
+      </div>
+      <button id="sync-chip" class="chip" title="Tap to sync now">
+        <span id="sync-dot" class="dot"></span>
+        <span id="sync-text">—</span>
+      </button>
+    </header>
+
+    <div id="company-row" class="company-row hidden">
+      <span class="field-label">Company</span>
+      <select id="company-select"></select>
+    </div>
+
+    <div class="lang-row" id="lang-row">
+      <button class="lang-btn active" data-lang="en-IN">EN</button>
+      <button class="lang-btn" data-lang="hi-IN">हिं</button>
+      <button class="lang-btn" data-lang="bn-IN">বাং</button>
+    </div>
+
+    <!-- capture -->
+    <div class="capture">
+      <button id="mic-btn" class="mic-btn" aria-label="Record expense">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2.5" width="6" height="12" rx="3"/>
+          <path d="M5 11.5a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="18.5" x2="12" y2="21.5"/>
+        </svg>
+      </button>
+      <div id="mic-hint" class="mic-hint">Tap and speak</div>
+    </div>
+
+    <!-- confirm card -->
+    <div id="confirm-card" class="confirm-card hidden">
+      <span class="field-label">Check &amp; correct</span>
+      <textarea id="transcript-box" rows="3" placeholder="Or type an expense here…"></textarea>
+      <div class="confirm-actions">
+        <button id="discard-btn" class="btn">Discard</button>
+        <button id="save-btn" class="btn btn-solid">Save entry</button>
+      </div>
+    </div>
+
+    <button id="type-btn" class="type-link">Type instead</button>
+
+    <!-- today -->
+    <div class="today">
+      <div class="today-head">
+        <div>
+          <span class="field-label">Today</span>
+          <div id="today-total" class="today-total">₹0</div>
+        </div>
+        <button id="undo-btn" class="btn btn-small">Undo last</button>
+      </div>
+      <ul id="entry-list" class="entry-list"></ul>
+    </div>
+
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
