@@ -86,21 +86,31 @@ async function syncNow() {
   syncing = true;
   updateSyncChip('Syncing…');
   try {
-    const entries = await allEntries();
+    // Capture order, so queued cash counts land in the sheet chronologically.
+    const entries = (await allEntries())
+      .sort((a, b) => a.captureTime.localeCompare(b.captureTime));
     for (const e of entries) {
       if (e.state === 'pending') {
-        const out = await post({
-          action: 'log', id: e.id, transcript: e.transcript,
-          captureTime: e.captureTime, company: e.company,
-        });
+        const out = e.type === 'cash'
+          ? await post({
+              action: 'cash', id: e.id, amount: e.amount, date: e.date,
+              note: e.note, captureTime: e.captureTime,
+            })
+          : await post({
+              action: 'log', id: e.id, transcript: e.transcript,
+              captureTime: e.captureTime, company: e.company,
+            });
         if (out.ok) {
           e.state = 'synced';
           if (out.parsed) e.parsed = out.parsed;
           if (out.status) e.status = out.status;
           await putEntry(e);
+          if (e.type === 'cash' && out.last) setLastCount(out.last);
         }
       } else if (e.state === 'void_pending') {
-        const out = await post({ action: 'void', id: e.id });
+        const out = await post({
+          action: 'void', id: e.id, company: e.company, entryType: e.type,
+        });
         if (out.ok || out.error === 'not_found') {
           e.state = 'voided';
           await putEntry(e);
@@ -113,6 +123,7 @@ async function syncNow() {
     syncing = false;
     updateSyncChip();
     renderToday();
+    renderCash();
   }
 }
 
@@ -189,8 +200,11 @@ function showMain() {
     companySelect.value = 'Seven Grain Bakery';
   }
 
+  $('cash-date').value = new Date().toISOString().slice(0, 10);
   updateSyncChip();
   renderToday();
+  renderCash();
+  refreshLastCount();
   syncNow();
 }
 
@@ -299,13 +313,14 @@ $('save-btn').addEventListener('click', async () => {
 // Undo last
 // ---------------------------------------------------------------------------
 
-$('undo-btn').addEventListener('click', async () => {
+async function undoLast(type, label) {
   const entries = (await allEntries())
+    .filter((e) => (e.type === 'cash') === (type === 'cash'))
     .filter((e) => e.state !== 'voided' && e.state !== 'void_pending')
     .sort((a, b) => a.captureTime.localeCompare(b.captureTime));
   const last = entries[entries.length - 1];
   if (!last) return toast('Nothing to undo.');
-  if (!confirm('Undo: "' + last.transcript.slice(0, 60) + '"?')) return;
+  if (!confirm('Undo ' + label(last) + '?')) return;
   if (last.state === 'pending') {
     await deleteEntry(last.id);
   } else {
@@ -315,7 +330,11 @@ $('undo-btn').addEventListener('click', async () => {
   }
   toast('Entry undone.');
   renderToday();
-});
+  renderCash();
+}
+
+$('undo-btn').addEventListener('click', () =>
+  undoLast('expense', (e) => '"' + e.transcript.slice(0, 60) + '"'));
 
 // ---------------------------------------------------------------------------
 // Today list + totals (this device's local log)
@@ -330,6 +349,7 @@ function guessAmount(e) {
 async function renderToday() {
   const today = new Date().toISOString().slice(0, 10);
   const entries = (await allEntries())
+    .filter((e) => e.type !== 'cash')
     .filter((e) => e.captureTime.slice(0, 10) === today)
     .sort((a, b) => b.captureTime.localeCompare(a.captureTime));
 
@@ -360,6 +380,134 @@ async function renderToday() {
 }
 
 // ---------------------------------------------------------------------------
+// View switch (Expense / Cash)
+// ---------------------------------------------------------------------------
+
+document.querySelectorAll('.view-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach((b) =>
+      b.classList.toggle('active', b === btn));
+    $('view-expense').classList.toggle('hidden', btn.dataset.view !== 'expense');
+    $('view-cash').classList.toggle('hidden', btn.dataset.view !== 'cash');
+    if (btn.dataset.view === 'cash') {
+      if (!$('cash-date').value) $('cash-date').value = new Date().toISOString().slice(0, 10);
+      renderCash();
+      refreshLastCount();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Daily cash count
+// ---------------------------------------------------------------------------
+
+const LAST_COUNT_KEY = 've-last-count';
+
+function setLastCount(last) {
+  if (last && last.date) localStorage.setItem(LAST_COUNT_KEY, JSON.stringify(last));
+  renderLastCount();
+}
+
+function getLastCount() {
+  try { return JSON.parse(localStorage.getItem(LAST_COUNT_KEY)); } catch (_) { return null; }
+}
+
+function renderLastCount() {
+  const last = getLastCount();
+  const el = $('cash-last');
+  if (!last) { el.textContent = 'No previous count on record.'; updateCashWarning(); return; }
+  const days = Math.round(
+    (new Date(new Date().toISOString().slice(0, 10)) - new Date(last.date)) / 86400000);
+  const ago = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+  el.textContent = 'Last count: ₹' + Number(last.amount).toLocaleString('en-IN') +
+    ' on ' + last.date + ' (' + ago + ')' + (last.device ? ' — ' + last.device : '');
+  updateCashWarning();
+}
+
+// Ask the server for the latest count across ALL devices; fall back to
+// whatever this device last knew when offline.
+async function refreshLastCount() {
+  if (!config || !navigator.onLine) { renderLastCount(); return; }
+  try {
+    const out = await post({ action: 'cash_last' });
+    if (out.ok && out.last) setLastCount(out.last);
+    else renderLastCount();
+  } catch (_) { renderLastCount(); }
+}
+
+function updateCashWarning() {
+  const el = $('cash-warning');
+  const date = $('cash-date').value;
+  const last = getLastCount();
+  if (date && last && last.date === date) {
+    el.textContent = 'A count for this date already exists: ₹' +
+      Number(last.amount).toLocaleString('en-IN') +
+      (last.device ? ' (' + last.device + ')' : '') + '. Saving adds a second one.';
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+$('cash-date').addEventListener('change', updateCashWarning);
+
+$('cash-save').addEventListener('click', async () => {
+  const amount = parseFloat($('cash-amount').value.replace(/[,\s₹]/g, ''));
+  const date = $('cash-date').value;
+  if (!date) return toast('Pick the count date.');
+  if (!(amount > 0)) return toast('Enter the counted amount.');
+
+  const entry = {
+    id: crypto.randomUUID(),
+    type: 'cash',
+    amount,
+    date,
+    note: $('cash-note').value.trim(),
+    captureTime: new Date().toISOString(),
+    state: 'pending',
+  };
+  await putEntry(entry);
+  $('cash-amount').value = '';
+  $('cash-note').value = '';
+  toast('Count saved' + (navigator.onLine ? '' : ' — will sync when online'));
+  if (navigator.vibrate) navigator.vibrate(40);
+  renderCash();
+  syncNow();
+});
+
+$('cash-undo').addEventListener('click', () =>
+  undoLast('cash', (e) => 'count of ₹' + Number(e.amount).toLocaleString('en-IN') + ' for ' + e.date));
+
+async function renderCash() {
+  const list = $('cash-list');
+  if (!list) return;
+  const entries = (await allEntries())
+    .filter((e) => e.type === 'cash')
+    .sort((a, b) => b.captureTime.localeCompare(a.captureTime))
+    .slice(0, 14);
+
+  list.innerHTML = '';
+  for (const e of entries) {
+    const voided = e.state === 'voided' || e.state === 'void_pending';
+    const li = document.createElement('li');
+    li.className = 'entry' + (voided ? ' voided' : '');
+    const desc = document.createElement('span');
+    desc.className = 'entry-desc';
+    desc.textContent = e.date + (e.note ? ' — ' + e.note : '');
+    const amt = document.createElement('span');
+    amt.className = 'entry-amt';
+    amt.textContent = '₹' + Number(e.amount).toLocaleString('en-IN');
+    const st = document.createElement('span');
+    st.className = 'entry-state';
+    st.textContent = voided ? 'VOID' : e.state === 'synced' ? '✓' : '…';
+    li.append(desc, amt, st);
+    list.appendChild(li);
+  }
+  renderLastCount();
+  updateSyncChip();
+}
+
+// ---------------------------------------------------------------------------
 // Sync chip
 // ---------------------------------------------------------------------------
 
@@ -373,6 +521,32 @@ async function updateSyncChip(label) {
 }
 
 $('sync-chip').addEventListener('click', syncNow);
+
+// ---------------------------------------------------------------------------
+// Theme toggle — manual, overrides the system light/dark setting.
+// index.html applies any saved choice before first paint to avoid a flash.
+// ---------------------------------------------------------------------------
+
+const THEME_KEY = 've-theme';
+
+function effectiveTheme() {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === 'dark' || stored === 'light') return stored;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function updateThemeIcon() {
+  const dark = effectiveTheme() === 'dark';
+  $('theme-toggle').querySelector('.icon-sun').classList.toggle('hidden', !dark);
+  $('theme-toggle').querySelector('.icon-moon').classList.toggle('hidden', dark);
+}
+
+$('theme-toggle').addEventListener('click', () => {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  document.documentElement.setAttribute('data-theme', next);
+  updateThemeIcon();
+});
 
 // ---------------------------------------------------------------------------
 // Toast + boot
@@ -389,6 +563,7 @@ function toast(msg) {
 
 (async function boot() {
   db = await openDb();
+  updateThemeIcon();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   if (config && config.role) showMain();
   else setupScreen.classList.remove('hidden');

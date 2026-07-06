@@ -3,12 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>Voice Expense</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Apply a saved manual theme before first paint, so there's no flash
+    // of the wrong theme while app.js loads.
+    (function () {
+      try {
+        var t = localStorage.getItem('ve-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -42,58 +53,122 @@
         <div class="brand-small">VOICE EXPENSE</div>
         <div id="device-label" class="device-label"></div>
       </div>
-      <button id="sync-chip" class="chip" title="Tap to sync now">
-        <span id="sync-dot" class="dot"></span>
-        <span id="sync-text">—</span>
-      </button>
+      <div class="topbar-actions">
+        <button id="sync-chip" class="chip" title="Tap to sync now">
+          <span id="sync-dot" class="dot"></span>
+          <span id="sync-text">—</span>
+        </button>
+        <button id="theme-toggle" class="chip icon-chip" title="Toggle dark mode" aria-label="Toggle dark mode">
+          <svg class="icon-sun hidden" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <line x1="12" y1="1.5" x2="12" y2="4"/>
+            <line x1="12" y1="20" x2="12" y2="22.5"/>
+            <line x1="4.2" y1="4.2" x2="6" y2="6"/>
+            <line x1="18" y1="18" x2="19.8" y2="19.8"/>
+            <line x1="1.5" y1="12" x2="4" y2="12"/>
+            <line x1="20" y1="12" x2="22.5" y2="12"/>
+            <line x1="4.2" y1="19.8" x2="6" y2="18"/>
+            <line x1="18" y1="6" x2="19.8" y2="4.2"/>
+          </svg>
+          <svg class="icon-moon hidden" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
-    <div id="company-row" class="company-row hidden">
-      <span class="field-label">Company</span>
-      <select id="company-select"></select>
+    <div class="view-row">
+      <button class="view-btn active" data-view="expense">EXPENSE</button>
+      <button class="view-btn" data-view="cash">CASH</button>
     </div>
 
-    <div class="lang-row" id="lang-row">
-      <button class="lang-btn active" data-lang="en-IN">EN</button>
-      <button class="lang-btn" data-lang="hi-IN">हिं</button>
-      <button class="lang-btn" data-lang="bn-IN">বাং</button>
-    </div>
+    <!-- ======== EXPENSE VIEW ======== -->
+    <div id="view-expense" class="view">
 
-    <!-- capture -->
-    <div class="capture">
-      <button id="mic-btn" class="mic-btn" aria-label="Record expense">
-        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor"
-             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="2.5" width="6" height="12" rx="3"/>
-          <path d="M5 11.5a7 7 0 0 0 14 0"/>
-          <line x1="12" y1="18.5" x2="12" y2="21.5"/>
-        </svg>
-      </button>
-      <div id="mic-hint" class="mic-hint">Tap and speak</div>
-    </div>
-
-    <!-- confirm card -->
-    <div id="confirm-card" class="confirm-card hidden">
-      <span class="field-label">Check &amp; correct</span>
-      <textarea id="transcript-box" rows="3" placeholder="Or type an expense here…"></textarea>
-      <div class="confirm-actions">
-        <button id="discard-btn" class="btn">Discard</button>
-        <button id="save-btn" class="btn btn-solid">Save entry</button>
+      <div id="company-row" class="company-row hidden">
+        <span class="field-label">Company</span>
+        <select id="company-select"></select>
       </div>
-    </div>
 
-    <button id="type-btn" class="type-link">Type instead</button>
+      <div class="lang-row" id="lang-row">
+        <button class="lang-btn active" data-lang="en-IN">EN</button>
+        <button class="lang-btn" data-lang="bn-IN">বাং</button>
+      </div>
 
-    <!-- today -->
-    <div class="today">
-      <div class="today-head">
-        <div>
-          <span class="field-label">Today</span>
-          <div id="today-total" class="today-total">₹0</div>
+      <!-- capture -->
+      <div class="capture">
+        <button id="mic-btn" class="mic-btn" aria-label="Record expense">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2.5" width="6" height="12" rx="3"/>
+            <path d="M5 11.5a7 7 0 0 0 14 0"/>
+            <line x1="12" y1="18.5" x2="12" y2="21.5"/>
+          </svg>
+        </button>
+        <div id="mic-hint" class="mic-hint">Tap and speak</div>
+      </div>
+
+      <!-- confirm card -->
+      <div id="confirm-card" class="confirm-card hidden">
+        <span class="field-label">Check &amp; correct</span>
+        <textarea id="transcript-box" rows="3" placeholder="Or type an expense here…"></textarea>
+        <div class="confirm-actions">
+          <button id="discard-btn" class="btn">Discard</button>
+          <button id="save-btn" class="btn btn-solid">Save entry</button>
         </div>
-        <button id="undo-btn" class="btn btn-small">Undo last</button>
       </div>
-      <ul id="entry-list" class="entry-list"></ul>
+
+      <button id="type-btn" class="type-link">Type instead</button>
+
+      <!-- today -->
+      <div class="today">
+        <div class="today-head">
+          <div>
+            <span class="field-label">Today</span>
+            <div id="today-total" class="today-total">₹0</div>
+          </div>
+          <button id="undo-btn" class="btn btn-small">Undo last</button>
+        </div>
+        <ul id="entry-list" class="entry-list"></ul>
+      </div>
+
+    </div>
+
+    <!-- ======== CASH COUNT VIEW ======== -->
+    <div id="view-cash" class="view hidden">
+
+      <div id="cash-last" class="cash-last">No previous count on record.</div>
+
+      <label class="field">
+        <span class="field-label">Count date</span>
+        <input id="cash-date" type="date">
+      </label>
+      <div id="cash-warning" class="cash-warning hidden"></div>
+
+      <label class="field">
+        <span class="field-label">Cash counted (₹)</span>
+        <input id="cash-amount" type="text" class="cash-amount" inputmode="decimal"
+               autocomplete="off" placeholder="0">
+      </label>
+
+      <label class="field">
+        <span class="field-label">Note (optional)</span>
+        <input id="cash-note" type="text" autocomplete="off"
+               placeholder="e.g. 4 × 500 moved to safe">
+      </label>
+
+      <button id="cash-save" class="btn btn-solid cash-save">Save count</button>
+
+      <div class="today">
+        <div class="today-head">
+          <div><span class="field-label">Recent counts</span></div>
+          <button id="cash-undo" class="btn btn-small">Undo last</button>
+        </div>
+        <ul id="cash-list" class="entry-list"></ul>
+      </div>
+
     </div>
 
   </section>
