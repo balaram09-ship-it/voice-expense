@@ -199,8 +199,9 @@ function showMain() {
       companySelect.appendChild(opt);
     }
     companySelect.value = 'Seven Grain Bakery';
-    // Staff pay these regulars in cash only — the toggle is CEO-only.
+    // Staff pay these in cash only — the toggle is CEO-only.
     $('quick-payment-row').classList.remove('hidden');
+    $('confirm-payment-row').classList.remove('hidden');
   }
 
   $('cash-date').value = new Date().toISOString().slice(0, 10);
@@ -283,16 +284,23 @@ $('type-btn').addEventListener('click', () => openConfirm(''));
 // the CEO device, payment method) is asked for. These upload as
 // already-structured data (vendor + amount + rule-based category on the
 // server) with no Claude parse involved.
+// Each card (quick-add, confirm) has its own Cash/UPI row — scope the
+// toggle to siblings within the same row, not every .payment-btn on screen.
 document.querySelectorAll('.payment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.payment-btn').forEach((b) =>
+    btn.parentElement.querySelectorAll('.payment-btn').forEach((b) =>
       b.classList.toggle('active', b === btn));
   });
 });
 
-function currentPayment() {
-  const active = document.querySelector('.payment-btn.active');
+function paymentIn(rowId) {
+  const active = document.querySelector('#' + rowId + ' .payment-btn.active');
   return active ? active.dataset.payment : 'cash';
+}
+
+function resetPaymentIn(rowId) {
+  document.querySelectorAll('#' + rowId + ' .payment-btn').forEach((b) =>
+    b.classList.toggle('active', b.dataset.payment === 'cash'));
 }
 
 $('quick-select').addEventListener('change', () => {
@@ -302,8 +310,7 @@ $('quick-select').addEventListener('change', () => {
   confirmCard.classList.add('hidden');
   $('quick-vendor').textContent = v;
   $('quick-amount').value = '';
-  document.querySelectorAll('.payment-btn').forEach((b) =>
-    b.classList.toggle('active', b.dataset.payment === 'cash'));
+  resetPaymentIn('quick-payment-row');
   $('quick-card').classList.remove('hidden');
   $('quick-amount').focus();
 });
@@ -314,7 +321,7 @@ $('quick-save').addEventListener('click', async () => {
   const vendor = $('quick-vendor').textContent;
   const amount = parseFloat($('quick-amount').value.replace(/[,\s₹]/g, ''));
   if (!(amount > 0)) return toast('Enter the amount.');
-  const payment = currentPayment();
+  const payment = paymentIn('quick-payment-row');
 
   const entry = {
     id: crypto.randomUUID(),
@@ -342,6 +349,7 @@ $('quick-save').addEventListener('click', async () => {
 function openConfirm(text) {
   $('quick-card').classList.add('hidden');
   transcriptBox.value = text;
+  resetPaymentIn('confirm-payment-row');
   confirmCard.classList.remove('hidden');
   if (!text) transcriptBox.focus();
 }
@@ -361,6 +369,9 @@ $('save-btn').addEventListener('click', async () => {
     captureTime: new Date().toISOString(),
     state: 'pending',
   };
+  // CEO's explicit choice overrides whatever Claude guesses from speech;
+  // staff never see this row, so their entries carry no override.
+  if (config.role === 'ceo') entry.payment = paymentIn('confirm-payment-row');
   await putEntry(entry);
   transcriptBox.value = '';
   confirmCard.classList.add('hidden');

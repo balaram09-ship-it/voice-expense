@@ -126,6 +126,15 @@
       <div id="confirm-card" class="confirm-card hidden">
         <span class="field-label">Check &amp; correct</span>
         <textarea id="transcript-box" rows="3" placeholder="Or type an expense here…"></textarea>
+
+        <div id="confirm-payment-row" class="field hidden">
+          <span class="field-label">Payment</span>
+          <div class="lang-row">
+            <button class="payment-btn active" data-payment="cash">CASH</button>
+            <button class="payment-btn" data-payment="upi">UPI</button>
+          </div>
+        </div>
+
         <div class="confirm-actions">
           <button id="discard-btn" class="btn">Discard</button>
           <button id="save-btn" class="btn btn-solid">Save entry</button>
