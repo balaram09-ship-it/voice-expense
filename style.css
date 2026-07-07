@@ -86,7 +86,7 @@ body {
 
 .field { display: flex; flex-direction: column; gap: 7px; }
 
-.field input, #transcript-box, #company-select {
+.field input, #transcript-box, #company-select, #quick-select {
   font: inherit;
   color: var(--ink);
   background: var(--paper);
@@ -206,7 +206,7 @@ input.cash-amount {
 
 .company-row { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
 
-#company-select {
+#company-select, #quick-select {
   appearance: none;
   -webkit-appearance: none;
   font-weight: 600;
@@ -219,7 +219,7 @@ input.cash-amount {
 
 .lang-row { display: flex; border: 1px solid var(--ink); margin-bottom: 8px; }
 
-.lang-btn {
+.lang-btn, .shift-btn {
   flex: 1;
   font: inherit;
   font-size: 14px;
@@ -232,8 +232,8 @@ input.cash-amount {
   cursor: pointer;
 }
 
-.lang-btn:last-child { border-right: none; }
-.lang-btn.active { background: var(--ink); color: var(--paper); }
+.lang-btn:last-child, .shift-btn:last-child { border-right: none; }
+.lang-btn.active, .shift-btn.active { background: var(--ink); color: var(--paper); }
 
 /* ---------- capture ---------- */
 
@@ -265,18 +265,25 @@ input.cash-amount {
 
 .mic-hint { margin-top: 12px; font-size: 13px; color: var(--mute); min-height: 1.2em; text-align: center; }
 
-.type-link {
-  font: inherit;
-  font-size: 13px;
+.type-icon-btn {
   align-self: center;
-  background: none;
-  border: none;
-  color: var(--mute);
-  text-decoration: underline;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
   cursor: pointer;
-  padding: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
+
+.type-icon-btn:active { transform: translate(1px, 1px); }
+
+.quick-row { margin-top: 14px; }
+
+.shift-row { margin-bottom: 0; }
 
 /* ---------- confirm card ---------- */
 

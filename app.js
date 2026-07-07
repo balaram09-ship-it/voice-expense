@@ -94,7 +94,7 @@ async function syncNow() {
         const out = e.type === 'cash'
           ? await post({
               action: 'cash', id: e.id, amount: e.amount, date: e.date,
-              note: e.note, captureTime: e.captureTime,
+              shift: e.shift, note: e.note, captureTime: e.captureTime,
             })
           : await post({
               action: 'log', id: e.id, transcript: e.transcript,
@@ -201,6 +201,7 @@ function showMain() {
   }
 
   $('cash-date').value = new Date().toISOString().slice(0, 10);
+  setShift(defaultShift());
   updateSyncChip();
   renderToday();
   renderCash();
@@ -274,6 +275,15 @@ function stopRecordingUI() {
 }
 
 $('type-btn').addEventListener('click', () => openConfirm(''));
+
+// Quick add — regulars: picking one prefills the confirm box; add the amount
+// and save. Claude maps these names to the right category server-side.
+$('quick-select').addEventListener('change', () => {
+  const v = $('quick-select').value;
+  if (!v) return;
+  $('quick-select').value = '';
+  openConfirm(v + ' ');
+});
 
 // ---------------------------------------------------------------------------
 // Confirm & save
@@ -391,6 +401,7 @@ document.querySelectorAll('.view-btn').forEach((btn) => {
     $('view-cash').classList.toggle('hidden', btn.dataset.view !== 'cash');
     if (btn.dataset.view === 'cash') {
       if (!$('cash-date').value) $('cash-date').value = new Date().toISOString().slice(0, 10);
+      setShift(defaultShift());
       renderCash();
       refreshLastCount();
     }
@@ -402,6 +413,26 @@ document.querySelectorAll('.view-btn').forEach((btn) => {
 // ---------------------------------------------------------------------------
 
 const LAST_COUNT_KEY = 've-last-count';
+
+// Two shifts a day; default follows the clock (afternoon onward = Evening).
+function defaultShift() {
+  return new Date().getHours() >= 14 ? 'Evening' : 'Morning';
+}
+
+function currentShift() {
+  const active = document.querySelector('.shift-btn.active');
+  return active ? active.dataset.shift : defaultShift();
+}
+
+function setShift(shift) {
+  document.querySelectorAll('.shift-btn').forEach((b) =>
+    b.classList.toggle('active', b.dataset.shift === shift));
+  updateCashWarning();
+}
+
+document.querySelectorAll('.shift-btn').forEach((btn) => {
+  btn.addEventListener('click', () => setShift(btn.dataset.shift));
+});
 
 function setLastCount(last) {
   if (last && last.date) localStorage.setItem(LAST_COUNT_KEY, JSON.stringify(last));
@@ -420,7 +451,8 @@ function renderLastCount() {
     (new Date(new Date().toISOString().slice(0, 10)) - new Date(last.date)) / 86400000);
   const ago = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
   el.textContent = 'Last count: ₹' + Number(last.amount).toLocaleString('en-IN') +
-    ' on ' + last.date + ' (' + ago + ')' + (last.device ? ' — ' + last.device : '');
+    ' on ' + last.date + (last.shift ? ' ' + last.shift.toLowerCase() : '') +
+    ' (' + ago + ')' + (last.device ? ' — ' + last.device : '');
   updateCashWarning();
 }
 
@@ -435,14 +467,25 @@ async function refreshLastCount() {
   } catch (_) { renderLastCount(); }
 }
 
-function updateCashWarning() {
+async function updateCashWarning() {
   const el = $('cash-warning');
   const date = $('cash-date').value;
+  const shift = currentShift();
   const last = getLastCount();
-  if (date && last && last.date === date) {
-    el.textContent = 'A count for this date already exists: ₹' +
-      Number(last.amount).toLocaleString('en-IN') +
-      (last.device ? ' (' + last.device + ')' : '') + '. Saving adds a second one.';
+
+  // Same date AND same shift is the duplicate case — two shifts a day is normal.
+  let dupe = null;
+  if (date && last && last.date === date && (last.shift || 'Morning') === shift) dupe = last;
+  if (!dupe && date && db) {
+    dupe = (await allEntries()).find((e) =>
+      e.type === 'cash' && e.date === date && (e.shift || 'Morning') === shift &&
+      e.state !== 'voided' && e.state !== 'void_pending');
+  }
+
+  if (dupe) {
+    el.textContent = 'A ' + shift.toLowerCase() + ' count for this date already exists: ₹' +
+      Number(dupe.amount).toLocaleString('en-IN') +
+      (dupe.device ? ' (' + dupe.device + ')' : '') + '. Saving adds a second one.';
     el.classList.remove('hidden');
   } else {
     el.classList.add('hidden');
@@ -462,6 +505,7 @@ $('cash-save').addEventListener('click', async () => {
     type: 'cash',
     amount,
     date,
+    shift: currentShift(),
     note: $('cash-note').value.trim(),
     captureTime: new Date().toISOString(),
     state: 'pending',
@@ -469,6 +513,7 @@ $('cash-save').addEventListener('click', async () => {
   await putEntry(entry);
   $('cash-amount').value = '';
   $('cash-note').value = '';
+  setShift(defaultShift());
   toast('Count saved' + (navigator.onLine ? '' : ' — will sync when online'));
   if (navigator.vibrate) navigator.vibrate(40);
   renderCash();
@@ -493,7 +538,8 @@ async function renderCash() {
     li.className = 'entry' + (voided ? ' voided' : '');
     const desc = document.createElement('span');
     desc.className = 'entry-desc';
-    desc.textContent = e.date + (e.note ? ' — ' + e.note : '');
+    desc.textContent = e.date + (e.shift ? ' ' + e.shift.toLowerCase() : '') +
+      (e.note ? ' — ' + e.note : '');
     const amt = document.createElement('span');
     amt.className = 'entry-amt';
     amt.textContent = '₹' + Number(e.amount).toLocaleString('en-IN');
