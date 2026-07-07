@@ -1,6 +1,6 @@
 /* Voice Expense — app-shell cache so the PWA opens with no network. */
 
-const CACHE = 've-shell-v3';
+const CACHE = 've-shell-v4';
 const SHELL = [
   './',
   './index.html',
