@@ -346,9 +346,28 @@ $('quick-save').addEventListener('click', async () => {
 // Confirm & save
 // ---------------------------------------------------------------------------
 
+// Pulls the first number out of spoken/typed text — the same extraction
+// guessAmount() falls back to, reused here to pre-fill the Amount box so a
+// dropped "rupees" (which throws off Claude's own parse) doesn't matter.
+function extractAmount(text) {
+  const m = text.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  return m ? m[0] : '';
+}
+
+// The Amount box auto-syncs to numbers found in the transcript as you type
+// or after speech — but stops once you've edited it by hand, so a manual
+// correction is never silently overwritten.
+let amountDirty = false;
+$('confirm-amount').addEventListener('input', () => { amountDirty = true; });
+transcriptBox.addEventListener('input', () => {
+  if (!amountDirty) $('confirm-amount').value = extractAmount(transcriptBox.value);
+});
+
 function openConfirm(text) {
   $('quick-card').classList.add('hidden');
   transcriptBox.value = text;
+  amountDirty = false;
+  $('confirm-amount').value = extractAmount(text);
   resetPaymentIn('confirm-payment-row');
   confirmCard.classList.remove('hidden');
   if (!text) transcriptBox.focus();
@@ -356,15 +375,19 @@ function openConfirm(text) {
 
 $('discard-btn').addEventListener('click', () => {
   transcriptBox.value = '';
+  $('confirm-amount').value = '';
   confirmCard.classList.add('hidden');
 });
 
 $('save-btn').addEventListener('click', async () => {
   const text = transcriptBox.value.trim();
   if (!text) return;
+  const amount = parseFloat($('confirm-amount').value.replace(/[,\s₹]/g, ''));
+  if (!(amount > 0)) return toast('Enter the amount.');
   const entry = {
     id: crypto.randomUUID(),
     transcript: text,
+    amount,
     company: currentCompany(),
     captureTime: new Date().toISOString(),
     state: 'pending',
