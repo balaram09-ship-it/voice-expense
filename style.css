@@ -219,7 +219,7 @@ input.cash-amount {
 
 .lang-row { display: flex; border: 1px solid var(--ink); margin-bottom: 8px; }
 
-.lang-btn, .shift-btn {
+.lang-btn, .shift-btn, .payment-btn {
   flex: 1;
   font: inherit;
   font-size: 14px;
@@ -232,8 +232,8 @@ input.cash-amount {
   cursor: pointer;
 }
 
-.lang-btn:last-child, .shift-btn:last-child { border-right: none; }
-.lang-btn.active, .shift-btn.active { background: var(--ink); color: var(--paper); }
+.lang-btn:last-child, .shift-btn:last-child, .payment-btn:last-child { border-right: none; }
+.lang-btn.active, .shift-btn.active, .payment-btn.active { background: var(--ink); color: var(--paper); }
 
 /* ---------- capture ---------- */
 

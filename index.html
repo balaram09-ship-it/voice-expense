@@ -136,6 +136,15 @@
       <div id="quick-card" class="confirm-card hidden">
         <span class="field-label">Quick expense</span>
         <div id="quick-vendor" class="quick-vendor">—</div>
+
+        <div id="quick-payment-row" class="field hidden">
+          <span class="field-label">Payment</span>
+          <div class="lang-row">
+            <button class="payment-btn active" data-payment="cash">CASH</button>
+            <button class="payment-btn" data-payment="upi">UPI</button>
+          </div>
+        </div>
+
         <input id="quick-amount" type="text" class="cash-amount" inputmode="decimal"
                autocomplete="off" placeholder="0">
         <div class="confirm-actions">

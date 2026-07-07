@@ -99,7 +99,7 @@ async function syncNow() {
           : await post({
               action: 'log', id: e.id, transcript: e.transcript,
               captureTime: e.captureTime, company: e.company,
-              quick: e.quick, vendor: e.vendor, amount: e.amount,
+              quick: e.quick, vendor: e.vendor, amount: e.amount, payment: e.payment,
             });
         if (out.ok) {
           e.state = 'synced';
@@ -199,6 +199,8 @@ function showMain() {
       companySelect.appendChild(opt);
     }
     companySelect.value = 'Seven Grain Bakery';
+    // Staff pay these regulars in cash only — the toggle is CEO-only.
+    $('quick-payment-row').classList.remove('hidden');
   }
 
   $('cash-date').value = new Date().toISOString().slice(0, 10);
@@ -277,9 +279,22 @@ function stopRecordingUI() {
 
 $('type-btn').addEventListener('click', () => openConfirm(''));
 
-// Quick add — regulars: the vendor is fixed, so only the amount is asked for.
-// These upload as already-structured data (vendor + amount + rule-based
-// category on the server) with no Claude parse involved.
+// Quick add — regulars: the vendor is fixed, so only the amount (and, for
+// the CEO device, payment method) is asked for. These upload as
+// already-structured data (vendor + amount + rule-based category on the
+// server) with no Claude parse involved.
+document.querySelectorAll('.payment-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.payment-btn').forEach((b) =>
+      b.classList.toggle('active', b === btn));
+  });
+});
+
+function currentPayment() {
+  const active = document.querySelector('.payment-btn.active');
+  return active ? active.dataset.payment : 'cash';
+}
+
 $('quick-select').addEventListener('change', () => {
   const v = $('quick-select').value;
   if (!v) return;
@@ -287,6 +302,8 @@ $('quick-select').addEventListener('change', () => {
   confirmCard.classList.add('hidden');
   $('quick-vendor').textContent = v;
   $('quick-amount').value = '';
+  document.querySelectorAll('.payment-btn').forEach((b) =>
+    b.classList.toggle('active', b.dataset.payment === 'cash'));
   $('quick-card').classList.remove('hidden');
   $('quick-amount').focus();
 });
@@ -297,13 +314,15 @@ $('quick-save').addEventListener('click', async () => {
   const vendor = $('quick-vendor').textContent;
   const amount = parseFloat($('quick-amount').value.replace(/[,\s₹]/g, ''));
   if (!(amount > 0)) return toast('Enter the amount.');
+  const payment = currentPayment();
 
   const entry = {
     id: crypto.randomUUID(),
     quick: true,
     vendor,
     amount,
-    transcript: vendor + ' ' + amount,
+    payment,
+    transcript: vendor + ' ' + amount + ' ' + payment,
     company: currentCompany(),
     captureTime: new Date().toISOString(),
     state: 'pending',
