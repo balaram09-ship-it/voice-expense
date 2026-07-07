@@ -283,6 +283,10 @@ input.cash-amount {
 
 .quick-row { margin-top: 14px; }
 
+.quick-vendor { font-size: 18px; font-weight: 700; }
+
+#quick-amount { border: 1px solid var(--line); }
+
 .shift-row { margin-bottom: 0; }
 
 /* ---------- confirm card ---------- */

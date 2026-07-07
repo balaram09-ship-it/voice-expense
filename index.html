@@ -132,6 +132,18 @@
         </div>
       </div>
 
+      <!-- quick expense card: fixed vendor, numeric amount only -->
+      <div id="quick-card" class="confirm-card hidden">
+        <span class="field-label">Quick expense</span>
+        <div id="quick-vendor" class="quick-vendor">—</div>
+        <input id="quick-amount" type="text" class="cash-amount" inputmode="decimal"
+               autocomplete="off" placeholder="0">
+        <div class="confirm-actions">
+          <button id="quick-discard" class="btn">Discard</button>
+          <button id="quick-save" class="btn btn-solid">Save entry</button>
+        </div>
+      </div>
+
       <button id="type-btn" class="type-icon-btn" title="Type instead" aria-label="Type instead">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

@@ -99,6 +99,7 @@ async function syncNow() {
           : await post({
               action: 'log', id: e.id, transcript: e.transcript,
               captureTime: e.captureTime, company: e.company,
+              quick: e.quick, vendor: e.vendor, amount: e.amount,
             });
         if (out.ok) {
           e.state = 'synced';
@@ -276,13 +277,43 @@ function stopRecordingUI() {
 
 $('type-btn').addEventListener('click', () => openConfirm(''));
 
-// Quick add — regulars: picking one prefills the confirm box; add the amount
-// and save. Claude maps these names to the right category server-side.
+// Quick add — regulars: the vendor is fixed, so only the amount is asked for.
+// These upload as already-structured data (vendor + amount + rule-based
+// category on the server) with no Claude parse involved.
 $('quick-select').addEventListener('change', () => {
   const v = $('quick-select').value;
   if (!v) return;
   $('quick-select').value = '';
-  openConfirm(v + ' ');
+  confirmCard.classList.add('hidden');
+  $('quick-vendor').textContent = v;
+  $('quick-amount').value = '';
+  $('quick-card').classList.remove('hidden');
+  $('quick-amount').focus();
+});
+
+$('quick-discard').addEventListener('click', () => $('quick-card').classList.add('hidden'));
+
+$('quick-save').addEventListener('click', async () => {
+  const vendor = $('quick-vendor').textContent;
+  const amount = parseFloat($('quick-amount').value.replace(/[,\s₹]/g, ''));
+  if (!(amount > 0)) return toast('Enter the amount.');
+
+  const entry = {
+    id: crypto.randomUUID(),
+    quick: true,
+    vendor,
+    amount,
+    transcript: vendor + ' ' + amount,
+    company: currentCompany(),
+    captureTime: new Date().toISOString(),
+    state: 'pending',
+  };
+  await putEntry(entry);
+  $('quick-card').classList.add('hidden');
+  toast('Saved' + (navigator.onLine ? '' : ' — will sync when online'));
+  if (navigator.vibrate) navigator.vibrate(40);
+  renderToday();
+  syncNow();
 });
 
 // ---------------------------------------------------------------------------
@@ -290,6 +321,7 @@ $('quick-select').addEventListener('change', () => {
 // ---------------------------------------------------------------------------
 
 function openConfirm(text) {
+  $('quick-card').classList.add('hidden');
   transcriptBox.value = text;
   confirmCard.classList.remove('hidden');
   if (!text) transcriptBox.focus();
@@ -351,6 +383,7 @@ $('undo-btn').addEventListener('click', () =>
 // ---------------------------------------------------------------------------
 
 function guessAmount(e) {
+  if (typeof e.amount === 'number') return e.amount; // quick + cash entries
   if (e.parsed && typeof e.parsed.amount === 'number') return e.parsed.amount;
   const m = e.transcript.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
   return m ? parseFloat(m[0]) : 0;
